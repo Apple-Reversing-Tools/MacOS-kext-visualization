@@ -11,12 +11,11 @@ Analysis tools for macOS Kernel Extensions with visualization.
 
 <div align="center">
   <img src="img/스크린샷 2025-10-27 오후 4.20.29.png" alt="Screenshot 2" width="600"/>
-  <p>VM Apple Kext 의존성 그래프</p>
+  <p>Apple Kext 의존성 그래프</p>
 </div>
 
 <div align="center">
   <img src="img/스크린샷 2025-10-27 오후 4.20.40.png" alt="Screenshot 3" width="600"/>
-  <p>Host Kext 상세 정보</p>
 </div>
 
 ## Quick Start
