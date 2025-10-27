@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>macOS Kext Analysis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .card p {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            color: #666;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .info code {
+            background: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>macOS Kext Analysis</h1>
+        
+        <div class="card">
+            <h2>VM Apple Kext</h2>
+            <p>Analyze and visualize kernel extensions from VM Apple environment.</p>
+            <a href="vmapple_kext/kext_visualization.html" class="btn">View VM Apple Analysis</a>
+        </div>
+        
+        <div class="card">
+            <h2>Host Kext</h2>
+            <p>Analyze and visualize kernel extensions from Host environment.</p>
+            <a href="host_kext/kext_visualization.html" class="btn">View Host Analysis</a>
+        </div>
+        
+        <div class="info">
+            <h3>Quick Start</h3>
+            <p>Generate new analysis data:</p>
+            <code>python main.py --all</code>
+            <br><br>
+            <p>Or run individual tasks:</p>
+            <code>python main.py --analyze</code> - Extract kext data<br>
+            <code>python main.py --visualize</code> - Generate HTML
+        </div>
+    </div>
+</body>
+</html>

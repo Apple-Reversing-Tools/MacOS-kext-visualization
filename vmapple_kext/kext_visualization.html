@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Apple Kext Dependency Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        #header {
+            padding: 15px 20px;
+            background: #2a2a2a;
+            border-bottom: 1px solid #3a3a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        #header h1 {
+            font-size: 18px;
+            color: #fff;
+        }
+        
+        #controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        #controls input[type="text"] {
+            padding: 8px 12px;
+            background: #3a3a3a;
+            border: 1px solid #4a4a4a;
+            color: #fff;
+            border-radius: 4px;
+            min-width: 200px;
+        }
+        
+        #controls input[type="text"]:focus {
+            outline: none;
+            border-color: #007aff;
+        }
+        
+        #controls button {
+            padding: 8px 16px;
+            background: #007aff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        #controls button:hover {
+            background: #0066cc;
+        }
+        
+        #controls button.secondary {
+            background: #4a4a4a;
+        }
+        
+        #controls button.secondary:hover {
+            background: #5a5a5a;
+        }
+        
+        #stats {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        #container {
+            width: 100vw;
+            height: calc(100vh - 60px);
+            position: relative;
+            background: #222;
+        }
+        
+        #legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(42, 42, 42, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 1000;
+            min-width: 200px;
+        }
+        
+        #legend h3 {
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        #info-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(42, 42, 42, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            max-width: 300px;
+            font-size: 11px;
+            display: none;
+        }
+        
+        #info-panel h3 {
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        #info-panel p {
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🍎 VM Apple Kext Dependency Analysis</h1>
+        <div id="controls">
+            <input type="text" id="searchBox" placeholder="Search Kext...">
+            <button onclick="searchKext()">Search</button>
+            <button class="secondary" onclick="resetView()">Reset</button>
+            <button class="secondary" onclick="toggleLayout()">Toggle Layout</button>
+            <button class="secondary" onclick="reduceEdges()">Reduce Edges</button>
+            <button class="secondary" onclick="showAllEdges()">Show All</button>
+            <button class="secondary" id="physicsBtn" onclick="togglePhysics()">Toggle Physics</button>
+        </div>
+        <div id="stats">
+            <span id="nodeCount">Nodes: 0</span>
+            <span id="edgeCount">Connections: 0</span>
+        </div>
+    </div>
+    
+    <div id="container">
+        <div class="loading">Loading data...</div>
+        <div id="legend">
+            <h3>Legend</h3>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4CAF50;"></div>
+                <span>System Kext</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2196F3;"></div>
+                <span>Hardware Kext</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF9800;"></div>
+                <span>Graphics Driver</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #9C27B0;"></div>
+                <span>Audio/Camera Driver</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #00BCD4;"></div>
+                <span>Framework</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #E91E63;"></div>
+                <span>Private Framework</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #F44336;"></div>
+                <span>Other</span>
+            </div>
+        </div>
+        <div id="info-panel"></div>
+    </div>
+
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script>
+        let network;
+        let nodes;
+        let edges;
+        let originalData;
+        let currentLayout = 'hierarchical';
+        let physicsEnabled = true;
+        
+        // Load data
+        loadData();
+        
+        async function loadData() {
+            try {
+                const response = await fetch('kexts_data.json');
+                originalData = await response.json();
+                
+                // Convert data to graph format
+                const graphData = convertToGraphData(originalData);
+                nodes = graphData.nodes;
+                edges = graphData.edges;
+                
+                drawNetwork();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.querySelector('.loading').textContent = 'Data load failed';
+            }
+        }
+        
+        function convertToGraphData(allItems) {
+            const nodesMap = new Map();
+            const edgeSet = new Set();
+            
+            // Create nodes
+            for (const [bundleId, item] of Object.entries(allItems)) {
+                const label = item.kext_name || item.name || bundleId.split('.').pop();
+                const sourceType = item.source_type || 'unknown';
+                const color = getColorForItem(bundleId, label, sourceType);
+                
+                nodesMap.set(bundleId, {
+                    id: bundleId,
+                    label: label,
+                    bundleId: bundleId,
+                    version: item.version || '',
+                    sourceType: sourceType,
+                    color: color,
+                    title: `${label}\\nBundle: ${bundleId}\\nVersion: ${item.version || 'N/A'}\\nType: ${sourceType}`,
+                    item: item
+                });
+            }
+            
+            // Create edges
+            for (const [bundleId, item] of Object.entries(allItems)) {
+                // Dependencies
+                for (const dep of item.dependencies || []) {
+                    if (nodesMap.has(dep)) {
+                        const edgeId = `${bundleId}->${dep}`;
+                        if (!edgeSet.has(edgeId)) {
+                            edgeSet.add(edgeId);
+                        }
+                    }
+                }
+                
+                // Libraries
+                for (const lib of item.libraries || []) {
+                    if (nodesMap.has(lib)) {
+                        const edgeId = `${bundleId}->${lib}`;
+                        if (!edgeSet.has(edgeId)) {
+                            edgeSet.add(edgeId);
+                        }
+                    }
+                }
+            }
+            
+            const edges = Array.from(edgeSet).map(edgeId => {
+                const [from, to] = edgeId.split('->');
+                return { 
+                    id: `edge_${edgeId.replace('->', '_')}`,
+                    from, 
+                    to, 
+                    arrows: 'to', 
+                    color: { color: '#888' } 
+                };
+            });
+            
+            return {
+                nodes: Array.from(nodesMap.values()),
+                edges: edges
+            };
+        }
+        
+        function getColorForItem(bundleId, label, sourceType) {
+            // Color by source type
+            switch(sourceType) {
+                case 'kext':
+                    if (label.includes('AppleH') || label.includes('AppleIO') || 
+                        label.includes('AppleIntel') || label.includes('AppleAMD')) {
+                        return '#2196F3'; // Blue
+                    }
+                    if (label.includes('Graphics') || label.includes('Metal') || 
+                        label.includes('Driver') || label.includes('GLDriver')) {
+                        return '#FF9800'; // Orange
+                    }
+                    if (label.includes('USB') || label.includes('Bluetooth') || 
+                        label.includes('Audio') || label.includes('Camera')) {
+                        return '#9C27B0'; // Purple
+                    }
+                    return '#4CAF50'; // Green
+                case 'framework':
+                    return '#00BCD4'; // Cyan
+                case 'private_framework':
+                    return '#E91E63'; // Pink
+                default:
+                    return '#F44336'; // Red
+            }
+        }
+        
+        function drawNetwork() {
+            const container = document.getElementById('container');
+            
+            const data = { nodes: nodes, edges: edges };
+            const options = {
+                physics: {
+                    enabled: physicsEnabled,
+                    stabilization: { iterations: 200, onlyDynamicEdges: true },
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        centralGravity: 0.1,
+                        springLength: 300,
+                        springConstant: 0.04,
+                        damping: 0.2,
+                        avoidOverlap: 1
+                    }
+                },
+                nodes: {
+                    shape: 'box',
+                    borderWidth: 2,
+                    font: { 
+                        size: 10, 
+                        color: '#fff',
+                        face: 'arial'
+                    },
+                    labelHighlightBold: false,
+                    margin: 10,
+                    padding: {
+                        top: 15,
+                        bottom: 15,
+                        left: 15,
+                        right: 15
+                    },
+                    shadow: {
+                        enabled: true,
+                        color: 'rgba(0,0,0,0.5)',
+                        size: 10,
+                        x: 5,
+                        y: 5
+                    }
+                },
+                edges: {
+                    width: 0.5,
+                    length: 300,
+                    color: { 
+                        inherit: false, 
+                        color: '#555',
+                        opacity: 0.3
+                    },
+                    arrows: {
+                        to: { enabled: false }
+                    },
+                    smooth: {
+                        type: 'continuous',
+                        forceDirection: 'none',
+                        roundness: 0.5
+                    },
+                    label: '',
+                    selectionWidth: 2
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 100,
+                    hideEdgesOnDrag: false,
+                    hideEdgesOnZoom: true
+                },
+                layout: {
+                    improvedLayout: true
+                }
+            };
+            
+            if (currentLayout === 'hierarchical') {
+                options.layout = {
+                    hierarchical: {
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        shakeTowards: 'roots',
+                        nodeSpacing: 200,
+                        levelSeparation: 250,
+                        treeSpacing: 300
+                    }
+                };
+            }
+            
+            network = new vis.Network(container, data, options);
+            
+            // Hover event for red edge highlighting
+            network.on('hoverNode', function(params) {
+                if (params.node) {
+                    highlightConnectedNodes(params.node);
+                }
+            });
+            
+            network.on('blurNode', function(params) {
+                resetHighlight();
+            });
+            
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.find(n => n.id === nodeId);
+                    if (node) {
+                        showInfoPanel(node);
+                        highlightConnectedNodes(nodeId);
+                    }
+                } else {
+                    hideInfoPanel();
+                    resetHighlight();
+                }
+            });
+            
+            network.on('stabilizationEnd', function() {
+                document.querySelector('.loading').style.display = 'none';
+                updateStats();
+                console.log('Stabilization complete');
+            });
+            
+            updatePhysicsButton();
+        }
+        
+        function updatePhysicsButton() {
+            const btn = document.getElementById('physicsBtn');
+            if (physicsEnabled) {
+                btn.textContent = 'Toggle Physics (On)';
+            } else {
+                btn.textContent = 'Toggle Physics (Off)';
+            }
+        }
+        
+        function resetHighlight() {
+            const currentData = network.getData();
+            
+            const restoredNodes = currentData.nodes.map(node => ({
+                ...node,
+                opacity: 1,
+                borderWidth: 2,
+                font: { 
+                    size: 10,
+                    color: '#fff',
+                    bold: false
+                },
+                shadow: node.shadow || {
+                    enabled: true,
+                    color: 'rgba(0,0,0,0.5)',
+                    size: 10,
+                    x: 5,
+                    y: 5
+                }
+            }));
+            
+            const restoredEdges = currentData.edges.map(edge => ({
+                ...edge,
+                width: 0.5,
+                color: { color: '#555', opacity: 0.3 }
+            }));
+            
+            network.setData({ nodes: restoredNodes, edges: restoredEdges });
+        }
+        
+        function highlightConnectedNodes(selectedNodeId) {
+            const currentData = network.getData();
+            
+            const connectedNodeIds = new Set([selectedNodeId]);
+            const connectedEdgeIds = new Set();
+            
+            currentData.edges.forEach(edge => {
+                if (edge.from === selectedNodeId || edge.to === selectedNodeId) {
+                    connectedNodeIds.add(edge.from);
+                    connectedNodeIds.add(edge.to);
+                    connectedEdgeIds.add(edge.id);
+                }
+            });
+            
+            const updatedNodes = currentData.nodes.map(node => {
+                if (connectedNodeIds.has(node.id)) {
+                    return {
+                        ...node,
+                        borderWidth: 3,
+                        font: { 
+                            size: 12,
+                            color: '#fff',
+                            bold: true
+                        },
+                        shadow: {
+                            enabled: true,
+                            color: 'rgba(0,255,255,0.8)',
+                            size: 15,
+                            x: 5,
+                            y: 5
+                        }
+                    };
+                } else {
+                    return {
+                        ...node,
+                        opacity: 0.1,
+                        font: { 
+                            size: 9,
+                            color: '#888',
+                            bold: false
+                        }
+                    };
+                }
+            });
+            
+            const updatedEdges = currentData.edges.map(edge => {
+                if (connectedEdgeIds.has(edge.id)) {
+                    return {
+                        ...edge,
+                        width: 3,
+                        color: { color: '#ff0000', opacity: 1.0 },
+                        dashes: false
+                    };
+                } else {
+                    return {
+                        ...edge,
+                        width: 0.5,
+                        color: { color: '#333', opacity: 0.05 }
+                    };
+                }
+            });
+            
+            network.setData({ nodes: updatedNodes, edges: updatedEdges });
+        }
+        
+        let displayedEdgesCount = edges.length;
+        
+        function updateStats() {
+            if (network) {
+                const data = network.getData();
+                displayedEdgesCount = data.edges.length;
+            }
+            document.getElementById('nodeCount').textContent = `Nodes: ${nodes.length}`;
+            document.getElementById('edgeCount').textContent = `Connections: ${displayedEdgesCount}`;
+        }
+        
+        function searchKext() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            if (!searchTerm) {
+                resetView();
+                return;
+            }
+            
+            const matchingIds = nodes.filter(node => 
+                node.label.toLowerCase().includes(searchTerm) ||
+                node.bundleId.toLowerCase().includes(searchTerm)
+            ).map(node => node.id);
+            
+            if (matchingIds.length > 0) {
+                const relatedIds = new Set(matchingIds);
+                edges.forEach(edge => {
+                    if (matchingIds.includes(edge.from) || matchingIds.includes(edge.to)) {
+                        relatedIds.add(edge.from);
+                        relatedIds.add(edge.to);
+                    }
+                });
+                
+                network.setSelection({ nodes: matchingIds });
+                network.focus(matchingIds[0], {
+                    scale: 2,
+                    animation: true
+                });
+            }
+        }
+        
+        function resetView() {
+            network.setData({
+                nodes: nodes,
+                edges: edges
+            });
+            network.fit();
+            document.getElementById('searchBox').value = '';
+            hideInfoPanel();
+            updateStats();
+        }
+        
+        function toggleLayout() {
+            currentLayout = currentLayout === 'hierarchical' ? 'force' : 'hierarchical';
+            physicsEnabled = true;
+            drawNetwork();
+        }
+        
+        function showInfoPanel(node) {
+            const panel = document.getElementById('info-panel');
+            panel.innerHTML = `
+                <h3>${node.label}</h3>
+                <p><strong>Bundle ID:</strong> ${node.bundleId}</p>
+                <p><strong>Version:</strong> ${node.version}</p>
+                <p><strong>Type:</strong> ${node.sourceType}</p>
+                <p><strong>Executable:</strong> ${node.item.executable || 'N/A'}</p>
+            `;
+            panel.style.display = 'block';
+        }
+        
+        function hideInfoPanel() {
+            document.getElementById('info-panel').style.display = 'none';
+        }
+        
+        function togglePhysics() {
+            physicsEnabled = !physicsEnabled;
+            const options = {
+                physics: {
+                    enabled: physicsEnabled
+                }
+            };
+            network.setOptions(options);
+            updatePhysicsButton();
+        }
+        
+        function reduceEdges() {
+            const currentData = network.getData();
+            const currentEdges = currentData.edges;
+            
+            const nodeConnections = new Map();
+            
+            currentEdges.forEach(edge => {
+                nodeConnections.set(edge.from, (nodeConnections.get(edge.from) || 0) + 1);
+                nodeConnections.set(edge.to, (nodeConnections.get(edge.to) || 0) + 1);
+            });
+            
+            const filteredEdges = currentEdges.filter(edge => {
+                const fromConnections = nodeConnections.get(edge.from) || 0;
+                const toConnections = nodeConnections.get(edge.to) || 0;
+                return fromConnections >= 5 && toConnections >= 5;
+            });
+            
+            network.setData({
+                nodes: nodes,
+                edges: filteredEdges
+            });
+            
+            updateStats();
+        }
+        
+        function showAllEdges() {
+            network.setData({
+                nodes: nodes,
+                edges: edges
+            });
+            updateStats();
+        }
+        
+        document.getElementById('searchBox').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchKext();
+            }
+        });
+    </script>
+</body>
+</html>
+
